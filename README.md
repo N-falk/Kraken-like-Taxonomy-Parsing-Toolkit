@@ -1,149 +1,106 @@
-# Kraken-like Taxonomy Parsing Toolkit
+# Parsing Kraken-like Taxonomic Reports
 
-A small collection of Python scripts for parsing **Kraken2-style taxonomic report files**, particularly reports that use full taxonomic rank names (e.g. `genus`, `family`, `phylum`) rather than the abbreviated rank codes commonly used by Kraken2 (e.g. `G`, `F`, `P`).
+A small collection of Python scripts for processing **Kraken-like taxonomic report files** and generating taxon-by-sample abundance tables with taxonomic hierarchy preserved.
 
-These scripts were originally developed to process **MMseqs2-derived taxonomic reports in Kraken-like format**, but they can be used more generally with compatible Kraken-style taxonomy reports.
+These scripts were developed to process taxonomic output generated from **MMseqs2/GDTB-tk workflows** that uses a format similar to Kraken2 reports, but represents taxonomic ranks using their full names (e.g. `phylum`, `family`, `genus`, `species`) rather than the abbreviated rank codes used by Kraken2.
 
-The toolkit provides three complementary functions:
+The workflow can:
 
-1. **Generate a taxon-by-sample abundance table at a specified taxonomic rank**
-2. **Build a database of taxonomic lineages from multiple report files**
-3. **Map abundance tables back onto full hierarchical taxonomic names**
+1. Extract taxon abundances from multiple report files at a specified taxonomic rank.
+2. Generate a database of taxonomic lineages represented across all samples.
+3. Map abundance data back onto full taxonomic lineage strings.
 
-Together, these scripts make it possible to go from a collection of Kraken-like reports to abundance tables containing detailed, hierarchical taxonomic names.
+The resulting tables can therefore retain information about the **taxonomic hierarchy** while maintaining a conventional taxon-by-sample abundance format.
 
 ---
 
 ## Workflow
 
-The three scripts are designed to be used sequentially:
+The three scripts are intended to be used sequentially:
 
 ```text
 Kraken-like report files
         │
-        ├──────────────────────┐
-        │                      │
-        ▼                      ▼
-kraken2otu2.py          falken_lineage.py
-        │                      │
-        ▼                      ▼
-otu_table_genus.csv     combined_lineages.txt
-        │                      │
-        └──────────┬───────────┘
-                   ▼
-             falken_map.py
-                   │
-                   ▼
-       abundance_with_genus.csv
+        ├──────────────────────────────┐
+        │                              │
+        ▼                              ▼
+kraken2otu2.py                  falken_lineage.py
+        │                              │
+        ▼                              ▼
+Taxon abundance table           Taxonomic lineage database
+        │                              │
+        └──────────────┬───────────────┘
+                       ▼
+                falken_map.py
+                       │
+                       ▼
+        Hierarchical abundance table
 ```
 
-### In brief
-
-**`kraken2otu2.py`**
-
-Extracts abundances for a specified taxonomic rank from multiple Kraken-like reports and creates a taxon-by-sample abundance table.
-
-**`falken_lineage.py`**
-
-Extracts taxonomic hierarchies from the same reports and creates a unique list of taxonomic lineage strings.
-
-**`falken_map.py`**
-
-Uses the abundance table and lineage database to replace taxon names with their full taxonomic hierarchy.
-
----
-
-# Input format
-
-The scripts expect a tab-delimited Kraken-like report with at least six columns.
-
-The important columns are:
-
-| Column | Description                            |
-| ------ | -------------------------------------- |
-| 1      | Percentage or other Kraken-style value |
-| 2      | Read count                             |
-| 3      | Additional value                       |
-| 4      | Taxonomic rank                         |
-| 5      | Taxonomic ID                           |
-| 6      | Taxon name                             |
-
-For example:
+For example, starting with multiple Kraken-like report files:
 
 ```text
-12.34	12345	12345	superkingdom	2	Bacteria
-10.21	10234	10234	phylum	1239	Firmicutes
-8.52	8523	8523	class	91061	Bacilli
-5.21	5210	5210	order	1385	Bacillales
-3.42	3420	3420	family	909932	Bacillaceae
-2.81	2810	2810	genus	1386	Bacillus
-1.42	1420	1420	species	1406	Bacillus subtilis
+sample1_report.txt
+sample2_report.txt
+sample3_report.txt
+...
 ```
 
-The scripts specifically look for the **taxonomic rank in column 4** and the **taxon name in column 6**.
-
-> **Note:** The scripts were originally modified to work with reports where taxonomic ranks are written as full words such as `genus`, `species`, `family`, etc. If your reports use Kraken2's abbreviated rank codes (`G`, `S`, `F`, etc.), the scripts will need to be modified accordingly.
-
----
-
-# Requirements
-
-The scripts use standard Python libraries plus `pandas` for `falken_map.py`.
-
-Recommended:
-
-```bash
-python3 --version
-```
-
-Python 3.8+ is recommended.
-
-Install pandas if necessary:
-
-```bash
-pip install pandas
-```
-
----
-
-# 1. `kraken2otu2.py`
-
-## What it does
-
-`kraken2otu2.py` reads multiple Kraken-like report files and extracts the abundance of taxa at a specified taxonomic rank.
-
-For example, specifying:
+the workflow can produce:
 
 ```text
+otu_table_genus.csv
+combined_lineages.txt
+abundance_with_genus.csv
+```
+
+where the final abundance table contains taxonomic names such as:
+
+```text
+Bacteria;Proteobacteria;Gammaproteobacteria;Pseudomonadales;Pseudomonadaceae;Pseudomonas
+```
+
+rather than simply:
+
+```text
+Pseudomonas
+```
+
+---
+
+# Scripts
+
+## 1. `kraken2otu2.py`
+
+Creates a taxon-by-sample abundance table from multiple Kraken-like report files.
+
+The script extracts the read count associated with each taxon at a specified taxonomic rank and combines the results across all input samples.
+
+Unlike the original `kraken2otu.py` script on which this was based, this version is designed for reports where taxonomic ranks are represented by their **full names**, for example:
+
+```text
+superkingdom
+phylum
+class
+order
+family
 genus
+species
 ```
 
-will produce a table containing all genera detected across the input samples.
-
-The resulting table has:
-
-* one row per taxon
-* one column per sample
-* read counts as abundance values
-
-Example:
+rather than abbreviated Kraken2 rank codes such as:
 
 ```text
-otu,Bacillus,Escherichia,Ferrovum
-Sample1,120,54,12
-Sample2,85,91,22
-Sample3,102,43,31
+D
+P
+C
+O
+F
+G
+S
 ```
 
-More generally, the structure is:
-
-```text
-otu,sample1,sample2,sample3,...
-taxon1,count,count,count,...
-taxon2,count,count,count,...
-```
-
-## Usage
+### Usage
 
 ```bash
 python3 kraken2otu2.py -i ./reports -l genus -e .txt
@@ -151,22 +108,11 @@ python3 kraken2otu2.py -i ./reports -l genus -e .txt
 
 Arguments:
 
-| Argument              | Description                                          |
-| --------------------- | ---------------------------------------------------- |
-| `-i`, `--inputfolder` | Directory containing Kraken-like report files        |
-| `-l`, `--level`       | Taxonomic rank to extract                            |
-| `-e`, `--extension`   | File extension/pattern used to identify report files |
-
-For example:
-
-```bash
-python3 kraken2otu2.py \
-    -i ./reports \
-    -l genus \
-    -e _report
-```
-
-This searches for files ending in `_report`.
+| Argument              | Description                                                  |
+| --------------------- | ------------------------------------------------------------ |
+| `-i`, `--inputfolder` | Directory containing the report files                        |
+| `-l`, `--level`       | Taxonomic rank to extract, e.g. `genus`, `species`, `family` |
+| `-e`, `--extension`   | Extension of input files; default is `.txt`                  |
 
 The output is written to the input directory as:
 
@@ -174,119 +120,113 @@ The output is written to the input directory as:
 otu_table_genus.csv
 ```
 
-For species-level abundance:
+for a genus-level analysis.
 
-```bash
-python3 kraken2otu2.py -i ./reports -l species -e _report
-```
+The rows represent taxa and the columns represent samples.
 
-which produces:
+Example:
 
 ```text
-otu_table_species.csv
+otu,sample1,sample2,sample3
+Pseudomonas,32447,67432,12543
+Acinetobacter,16974,16974,1832
+Shewanella,24114,24114,532
 ```
 
 ---
 
-# 2. `falken_lineage.py`
+## 2. `falken_lineage.py`
 
-## What it does
+Generates a list of the taxonomic lineages represented across all input report files.
 
-`falken_lineage.py` extracts taxonomic hierarchies from multiple Kraken-like report files.
+The script reads the taxonomic hierarchy contained within the reports and reconstructs lineage strings from:
 
-Rather than simply recording individual taxa, it reconstructs the hierarchy represented in each report.
+```text
+superkingdom
+phylum
+class
+order
+family
+genus
+species
+```
 
-For example:
+For example, instead of simply recording:
+
+```text
+Pseudomonas
+```
+
+it can generate:
+
+```text
+Bacteria;Proteobacteria;Gammaproteobacteria;Pseudomonadales;Pseudomonadaceae;Pseudomonas
+```
+
+The resulting file contains unique lineage strings and acts as a simple taxonomy hierarchy database for the subsequent mapping step.
+
+### Usage
+
+```bash
+python3 falken_lineage.py -i ./reports -e .txt -o combined_lineages.txt
+```
+
+Arguments:
+
+| Argument            | Description                                 |
+| ------------------- | ------------------------------------------- |
+| `-i`, `--input`     | Directory containing the report files       |
+| `-e`, `--extension` | Extension of input files; default is `.txt` |
+| `-o`, `--output`    | Name of the output lineage file             |
+
+Example output:
 
 ```text
 Bacteria
 Bacteria;Proteobacteria
 Bacteria;Proteobacteria;Gammaproteobacteria
-Bacteria;Proteobacteria;Gammaproteobacteria;Acidithiobacillales
-Bacteria;Proteobacteria;Gammaproteobacteria;Acidithiobacillales;Acidithiobacillaceae
-Bacteria;Proteobacteria;Gammaproteobacteria;Acidithiobacillales;Acidithiobacillaceae;Acidithiobacillus
-```
-
-The output is deduplicated, producing a database of unique taxonomic strings observed across all input reports.
-
-This is useful because the same genus name can potentially occur in different taxonomic contexts. The lineage file provides the information needed to associate a taxon with its hierarchical classification.
-
-## Usage
-
-```bash
-python3 falken_lineage.py -i ./reports -e _report -o combined_lineages.txt
-```
-
-Arguments:
-
-| Argument            | Description                                     |
-| ------------------- | ----------------------------------------------- |
-| `-i`, `--input`     | Directory containing Kraken-like report files   |
-| `-e`, `--extension` | File extension/pattern identifying report files |
-| `-o`, `--output`    | Name of the lineage output file                 |
-
-Example:
-
-```bash
-python3 falken_lineage.py \
-    -i ./reports \
-    -e _report \
-    -o combined_lineages.txt
-```
-
-Output:
-
-```text
-combined_lineages.txt
+Bacteria;Proteobacteria;Gammaproteobacteria;Pseudomonadales
+Bacteria;Proteobacteria;Gammaproteobacteria;Pseudomonadales;Pseudomonadaceae
+Bacteria;Proteobacteria;Gammaproteobacteria;Pseudomonadales;Pseudomonadaceae;Pseudomonas
 ```
 
 ---
 
-# 3. `falken_map.py`
+## 3. `falken_map.py`
 
-## What it does
+Maps the abundance table produced by `kraken2otu2.py` onto the lineage database produced by `falken_lineage.py`.
 
-`falken_map.py` combines the outputs of the first two scripts.
-
-It takes:
-
-1. An abundance table generated by `kraken2otu2.py`
-2. A lineage database generated by `falken_lineage.py`
-
-It then replaces the taxon names in the abundance table with their full taxonomic hierarchy.
-
-For example, an abundance table might initially contain:
-
-```text
-otu,sample1,sample2,sample3
-Bacillus,100,250,80
-Ferrovum,50,120,35
-```
-
-After mapping, the OTU names can become:
-
-```text
-otu,sample1,sample2,sample3
-Bacteria;Firmicutes;Bacilli;Bacillales;Bacillaceae;Bacillus,100,250,80
-Bacteria;Proteobacteria;Gammaproteobacteria;Burkholderiales;Gallionellaceae;Ferrovum,50,120,35
-```
-
-This preserves the abundance values while adding taxonomic context to the taxon names.
-
-## Usage
-
-Unlike the first two scripts, the input/output filenames and desired taxonomic level are currently specified **inside the Python script**.
-
-Edit:
-
-```python
-abundance_csv = "otu_table_genus.csv"
-taxonomy_txt = "combined_lineages.txt"
-output_csv = "abundance_with_genus.csv"
-desired_level = "genus"
-```
+This allows taxon names in the abundance table to be replaced with their full taxonomic hierarchy.
 
 For example:
+
+```text
+Pseudomonas
+```
+
+can become:
+
+```text
+Bacteria;Proteobacteria;Gammaproteobacteria;Pseudomonadales;Pseudomonadaceae;Pseudomonas
+```
+
+The script can truncate the hierarchy at a desired taxonomic level.
+
+For example, a genus-level output would retain:
+
+```text
+Bacteria;Proteobacteria;Gammaproteobacteria;Pseudomonadales;Pseudomonadaceae;Pseudomonas
+```
+
+while a family-level output would retain:
+
+```text
+Bacteria;Proteobacteria;Gammaproteobacteria;Pseudomonadales;Pseudomonadaceae
+```
+
+### Usage
+
+The input and desired taxonomic level are currently specified within the script:
 
 ```python
 abundance_csv = "otu_table_genus.csv"
@@ -303,29 +243,30 @@ python3 falken_map.py
 
 ---
 
-# Complete example workflow
+# Complete Example
 
-Suppose a directory contains:
+Assume a directory contains:
 
 ```text
 reports/
-├── sample1_report
-├── sample2_report
-├── sample3_report
-├── sample4_report
-└── ...
+├── sample1_report.txt
+├── sample2_report.txt
+├── sample3_report.txt
+└── sample4_report.txt
 ```
 
-## Step 1 — Generate genus abundance table
+### Step 1 — Generate the abundance table
+
+For genus-level abundances:
 
 ```bash
 python3 kraken2otu2.py \
     -i ./reports \
     -l genus \
-    -e _report
+    -e .txt
 ```
 
-This produces:
+This creates:
 
 ```text
 reports/otu_table_genus.csv
@@ -333,26 +274,28 @@ reports/otu_table_genus.csv
 
 ---
 
-## Step 2 — Generate the taxonomic lineage database
+### Step 2 — Generate the lineage database
 
 ```bash
 python3 falken_lineage.py \
     -i ./reports \
-    -e _report \
+    -e .txt \
     -o combined_lineages.txt
 ```
 
-This produces:
+This creates:
 
 ```text
 combined_lineages.txt
 ```
 
+containing the unique taxonomic lineages represented across the input reports.
+
 ---
 
-## Step 3 — Map genera to their full taxonomy
+### Step 3 — Add hierarchical taxonomy to the abundance table
 
-Edit `falken_map.py`:
+Edit the settings at the bottom of `falken_map.py`:
 
 ```python
 abundance_csv = "otu_table_genus.csv"
@@ -367,17 +310,19 @@ Then:
 python3 falken_map.py
 ```
 
-The final output is:
+The resulting file:
 
 ```text
 abundance_with_genus.csv
 ```
 
+contains the original abundance information but with the taxon names replaced by hierarchical lineage strings.
+
 ---
 
-# Choosing a taxonomic level
+# Supported Taxonomic Levels
 
-The scripts currently recognise the following taxonomic hierarchy:
+The scripts currently recognise the following ranks:
 
 ```text
 superkingdom
@@ -389,163 +334,94 @@ genus
 species
 ```
 
-For example, running `kraken2otu2.py` at the genus level:
+For example:
 
 ```bash
-python3 kraken2otu2.py -i ./reports -l genus -e _report
+python3 kraken2otu2.py -i ./reports -l genus -e .txt
 ```
 
-followed by `falken_map.py` with:
+or:
 
-```python
-desired_level = "genus"
+```bash
+python3 kraken2otu2.py -i ./reports -l family -e .txt
 ```
 
-will produce names such as:
+or:
 
-```text
-Bacteria;Proteobacteria;Gammaproteobacteria;Burkholderiales;Gallionellaceae;Ferrovum
+```bash
+python3 kraken2otu2.py -i ./reports -l species -e .txt
 ```
-
-rather than simply:
-
-```text
-Ferrovum
-```
-
-This can be particularly useful for downstream ecological and microbiome analyses where retaining taxonomic context is important.
 
 ---
 
-# Important considerations
+# Input Format
 
-### Taxonomic names must be consistent
+The scripts are designed for **Kraken-like tab-delimited taxonomic reports** containing at least six fields, with the relevant information in the following positions:
 
-The mapping performed by `falken_map.py` relies on taxon names matching between the abundance table and lineage database.
-
-If a taxon cannot be found in the lineage database, the original taxon name is retained.
-
-### Use the same report set
-
-The abundance table and lineage database should ideally be generated from the **same collection of report files**.
+```text
+field 2 → read count
+field 4 → taxonomic rank
+field 6 → taxon name
+```
 
 For example:
 
 ```text
-reports/
-    sample1_report
-    sample2_report
-    sample3_report
+27.67    168354    0    superkingdom    2    Bacteria
+23.46    142758    1804    phylum    1224    Proteobacteria
+17.38    105738    1070    class    1236    Gammaproteobacteria
+8.18     49747     24      order    72274   Pseudomonadales
+5.35     32566     36      family   135621  Pseudomonadaceae
+5.33     32447     4268    genus    286     Pseudomonas
 ```
 
-should be used to generate both:
-
-```text
-otu_table_genus.csv
-```
-
-and:
-
-```text
-combined_lineages.txt
-```
-
-### Database/version consistency
-
-If the Kraken-like reports were generated using different taxonomic databases or database versions, taxonomic names and classifications may not be directly comparable.
-
-For reproducible analyses, it is recommended that reports being combined were generated using the same taxonomy database/version and comparable classification settings.
-
-### Rank naming
-
-These scripts expect full rank names such as:
-
-```text
-superkingdom
-phylum
-class
-order
-family
-genus
-species
-```
-
-They do not automatically translate abbreviated Kraken2 rank codes such as:
-
-```text
-D
-P
-C
-O
-F
-G
-S
-```
+The exact upstream software producing these reports may vary; the important requirement is that the reports follow this general tab-delimited structure.
 
 ---
 
-# Why three scripts?
+# Relationship to Kraken2
 
-The separation into three scripts provides flexibility.
+These scripts are **not a replacement for Kraken2** and do not perform taxonomic classification themselves.
 
-`kraken2otu2.py` answers:
+Instead, they are designed to parse **Kraken-like report files that have already been generated by a taxonomic classification workflow**.
 
-> **What taxa are present, and how abundant are they in each sample?**
-
-`falken_lineage.py` answers:
-
-> **What taxonomic hierarchy is associated with the taxa detected across my dataset?**
-
-`falken_map.py` answers:
-
-> **Can I combine those two pieces of information so that my abundance table retains the full taxonomic hierarchy?**
-
-This separation also means that the same lineage database can potentially be reused for multiple abundance tables generated from the same report collection.
+They may therefore be useful for outputs from other tools or pipelines that produce a report structure similar to Kraken2.
 
 ---
 
-# Original application
+# Acknowledgements and Original Code
 
-These scripts were initially developed for processing MMseqs2-derived taxonomic assignments generated in a Kraken-like report format.
+The `kraken2otu2.py` script was adapted from [`kraken2otu.py`](https://github.com/sipost1/kraken2OTUtable) by **sipost1**.
 
-The original workflow involved:
+The original `kraken2otu.py` creates a simple taxon-by-sample OTU table from Kraken2 reports. The original repository describes the script as extracting taxon names and read counts from multiple Kraken2 report files and combining them into a single OTU table.
 
-```text
-MMseqs2 taxonomic assignment
-            ↓
-Kraken-like reports
-            ↓
-kraken2otu2.py
-            ↓
-taxon abundance table
-            +
-falken_lineage.py
-            ↓
-taxonomic lineage database
-            ↓
-falken_map.py
-            ↓
-hierarchical abundance table
-```
+`kraken2otu2.py` retains the core approach of the original script but has been modified to:
 
-The scripts themselves do not require MMseqs2 and are intended to be useful for other Kraken-like report formats that follow the expected tab-delimited structure.
+* process Kraken-like reports using full taxonomic rank names;
+* support ranks such as `genus`, `family`, and `species`;
+* handle malformed/incomplete report lines;
+* accommodate the report format generated by the upstream MMseqs2/GDTB-tk workflow.
+
+The additional scripts, `falken_lineage.py` and `falken_map.py`, were developed to extend this approach by generating and applying hierarchical taxonomic lineage information.
+
+Original repository:
+
+https://github.com/sipost1/kraken2OTUtable
+
+The original repository is distributed under the **MIT License**.
 
 ---
 
-# Citation / acknowledgement
+# Licence
 
-If you use these scripts in published work, please cite the original taxonomic classification software/database used to generate your reports (e.g. Kraken2, MMseqs2, GTDB, or another relevant resource), in addition to citing this repository where appropriate.
+This project contains modified code derived from `kraken2otu.py` from the `sipost1/kraken2OTUtable` repository.
 
----
-
-# License
-
-[Add your preferred license here, e.g. MIT License.]
+The original code is distributed under the MIT License. Please see the accompanying `LICENSE` file for the applicable licence terms and attribution.
 
 ---
 
-# Contributing
+# Notes
 
-Issues, suggestions, bug reports, and pull requests are welcome.
+These scripts were developed primarily for processing microbial metagenomic taxonomic data and are intended to provide a lightweight way of converting Kraken-like report files into abundance tables suitable for downstream analysis in R, Python, or other statistical environments.
 
-If you encounter a Kraken-like report format that is not handled correctly, please provide an example of the report structure (with any sensitive information removed) when opening an issue.
+The scripts are deliberately simple and do not attempt to perform extensive validation of taxonomy or resolve conflicting taxonomic assignments between reports. Users should therefore inspect their input reports and confirm that the taxonomic format is consistent across samples before combining them.
