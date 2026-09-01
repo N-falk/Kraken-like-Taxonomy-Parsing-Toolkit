@@ -503,6 +503,3 @@ This is a lightweight research tool developed for parsing Kraken-like taxonomic 
 The scripts are intentionally simple and transparent so that they can be readily adapted to other Kraken-like output formats and taxonomic workflows.
 
 ```
-
-One thing I would **definitely do before publishing** is check the licence on the original `sipost1/kraken2OTUtable` repository and make the attribution/licence section match it exactly. I left that part deliberately conservative rather than guessing at the licence.
-```
